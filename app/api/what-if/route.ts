@@ -26,6 +26,8 @@ Each step is one short sentence. "severity" is how bad the outcome would be.
 "already_acted" is true only if the user says they have already done it,
 for example "I already paid". Then "advice" must tell them to follow
 FinGuard's emergency steps now, starting with a call to 1930.
+1930 is India's national cyber fraud helpline, not a bank's number; to reach
+their bank, they should use the number on their card or the bank's official app.
 If the action would be harmless, for example because the message is
 genuine, say so in the steps and use LOW severity.
 This is a scenario, not a prediction, so never claim certainty. Never ask

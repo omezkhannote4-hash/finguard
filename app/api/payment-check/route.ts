@@ -46,6 +46,8 @@ risky payment, pick the closest scam_type.
 
 "action" lists what to do before paying, such as checking the recipient
 through a number you already trust, waiting, or not paying at all.
+1930 is India's national cyber fraud helpline, not a bank's number; to reach
+their bank, they should use the number on their card or the bank's official app.
 Write "why", "simple" and "action" in ${language}. Keep risk_level,
 scam_type and the signal names in English exactly as listed above, and
 copy flagged_phrases verbatim from the reason without translating them.

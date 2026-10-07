@@ -1,4 +1,4 @@
-import { RISK_LEVELS, SCAM_TYPES, SIGNALS, type Analysis } from "@/lib/analysis";
+import { SCAM_TYPES, SIGNALS, type Analysis } from "@/lib/analysis";
 
 function pick<T extends string>(options: readonly T[], value: unknown): T | undefined {
   const wanted = String(value ?? "").trim().toLowerCase();
@@ -17,7 +17,8 @@ function strings(value: unknown): string[] {
     : [];
 }
 
-// Same bands as the risk meter; only used if the model's own level is invalid.
+// The level always follows the score, using the risk meter's colour bands, so
+// the label and the meter can't disagree (the model once said HIGH for 100).
 function levelFor(score: number): Analysis["risk_level"] {
   if (score < 30) return "LOW";
   if (score < 60) return "MEDIUM";
@@ -48,7 +49,7 @@ export function normaliseAnalysis(raw: unknown, source: string): Analysis | null
 
   return {
     risk_score: riskScore,
-    risk_level: pick(RISK_LEVELS, r.risk_level) ?? levelFor(riskScore),
+    risk_level: levelFor(riskScore),
     scam_type: scamType,
     dna: SIGNALS.map((signal) => ({ signal, detected: detected.has(stem(signal)) })),
     flagged_phrases: strings(r.flagged_phrases).filter((phrase) =>
