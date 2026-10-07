@@ -30,14 +30,16 @@ OTP/PIN Request, Unrealistic Reward, Payment Request.
 Urgency is detected if someone created urgency. Suspicious Link is detected
 if a link or QR code was involved. Judge the other signals from the reason.
 
-Score payment risk, not message risk:
-new recipient 20, someone created urgency 20, link or QR code involved 20,
-amount of ₹10,000 or more 10 (₹50,000 or more 20 instead), and a reason
-that matches a scam pattern 30: a fee to receive a prize, refund, loan or
-job; guaranteed or very high returns; someone claiming to be a bank, police,
-courier or customer care; paying to "verify", "unlock" or "activate" an
-account; scanning a QR code or entering a UPI PIN to receive money.
-Cap at 100.
+Score payment risk, not message risk, with this weighted rubric:
+- new recipient: 20
+- someone created urgency: 25
+- a link or QR code was involved: 25
+- amount over ₹10,000: 15
+- the reason mentions a fee, KYC, a prize, a refund, a loan release,
+  customs or a penalty: 30
+risk_score must be exactly the sum of the weights that apply, capped at 100.
+risk_level comes from the score: under 30 LOW, 30 to 59 MEDIUM, 60 to 80
+HIGH, above 80 CRITICAL.
 
 CRITICAL: Ordinary payments to people or businesses the user already knows
 (rent, bills, shopping, family), with no urgency and no link or QR code,
