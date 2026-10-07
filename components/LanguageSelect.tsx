@@ -1,12 +1,13 @@
 "use client";
 
-import { useLanguage } from "@/components/LanguageProvider";
+import { useLanguage, useT } from "@/components/LanguageProvider";
 import { ChevronDownIcon, GlobeIcon } from "@/components/icons";
 import { LANGUAGES, type LanguageCode } from "@/lib/languages";
 
 // `compact` always shows the short code, for headers with little room.
 export default function LanguageSelect({ compact = false }: { compact?: boolean }) {
   const { language, setLanguage } = useLanguage();
+  const t = useT();
   const current = LANGUAGES.find((option) => option.code === language) ?? LANGUAGES[0];
 
   return (
@@ -18,7 +19,7 @@ export default function LanguageSelect({ compact = false }: { compact?: boolean 
       <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
       {/* The real control: a native select stretched invisibly over the pill, so phones open their own picker. */}
       <select
-        aria-label="Language for explanations"
+        aria-label={t("header.language")}
         value={language}
         onChange={(event) => setLanguage(event.target.value as LanguageCode)}
         className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"

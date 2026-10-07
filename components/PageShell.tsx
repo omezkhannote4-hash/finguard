@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import T from "@/components/T";
 import { ArrowRightIcon } from "@/components/icons";
 
 // The frame every page shares, so they match exactly: the accent glow, a sticky
@@ -31,24 +32,28 @@ export default function PageShell({
       <footer className="mx-auto w-full max-w-xl px-4 pb-10">
         <div className="border-t border-neutral-800 pt-6 text-center text-xs leading-relaxed text-neutral-500">
           <p className="text-balance text-sm font-medium text-neutral-300">
-            FinGuard never asks for your password, OTP or PIN.
+            <T k="footer.neverAsks" />
           </p>
           <p className="mt-2">
             <Link
               href="/learn"
               className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-sm font-semibold text-accent transition-colors hover:text-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              Learn to spot scams
-              <ArrowRightIcon className="h-4 w-4" />
+              <T k="footer.learn" />
+              <ArrowRightIcon className="h-4 w-4 shrink-0" />
             </Link>
           </p>
           {/* On phones the line breaks after "Groq" rather than mid-phrase. */}
           <p className="mt-1">
-            <span className="block sm:inline">Built on Groq</span>
+            <span className="block sm:inline">
+              <T k="footer.builtOn" />
+            </span>
             <span aria-hidden="true" className="hidden sm:inline">
               {" · "}
             </span>
-            <span className="block sm:inline">structured JSON output · weighted risk rubric</span>
+            <span className="block sm:inline">
+              <T k="footer.tech" />
+            </span>
           </p>
         </div>
       </footer>

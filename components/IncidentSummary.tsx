@@ -1,56 +1,55 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLanguage, useT } from "@/components/LanguageProvider";
 import { CheckIcon, CopyIcon } from "@/components/icons";
+import type { TranslationKey } from "@/lib/i18n";
 
 type FieldKey = "utr" | "amount" | "when" | "phone" | "upi" | "url";
+type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string;
 
-const FIELDS: {
-  key: FieldKey;
-  label: string;
-  type?: string;
-  inputMode?: "decimal" | "url";
-  placeholder?: string;
-}[] = [
-  { key: "utr", label: "Transaction ID or UTR", placeholder: "e.g. 412345678901" },
-  { key: "amount", label: "Amount lost (₹)", inputMode: "decimal", placeholder: "e.g. 25,000" },
-  { key: "when", label: "Date and time", type: "datetime-local" },
-  { key: "phone", label: "Their phone number", type: "tel", placeholder: "e.g. +91 98765 43210" },
-  { key: "upi", label: "Their UPI ID", placeholder: "e.g. name@bank" },
-  { key: "url", label: "Website link (URL)", inputMode: "url", placeholder: "e.g. http://…" },
+// Labels and placeholders are in lib/i18n.ts under incident.field.* and incident.placeholder.*.
+const FIELDS: { key: FieldKey; type?: string; inputMode?: "decimal" | "url"; placeholder: boolean }[] = [
+  { key: "utr", placeholder: true },
+  { key: "amount", inputMode: "decimal", placeholder: true },
+  { key: "when", type: "datetime-local", placeholder: false },
+  { key: "phone", type: "tel", placeholder: true },
+  { key: "upi", placeholder: true },
+  { key: "url", inputMode: "url", placeholder: true },
 ];
 
 type Values = Record<FieldKey | "description", string>;
 
 const EMPTY: Values = { utr: "", amount: "", when: "", phone: "", upi: "", url: "", description: "" };
 
-function formatAmount(text: string) {
+function formatAmount(text: string, locale: string) {
   const cleaned = text.replace(/[₹,\s]/g, "");
-  return /^\d+(\.\d{1,2})?$/.test(cleaned) ? `₹${Number(cleaned).toLocaleString("en-IN")}` : text;
+  return /^\d+(\.\d{1,2})?$/.test(cleaned) ? `₹${Number(cleaned).toLocaleString(locale)}` : text;
 }
 
-function formatWhen(value: string) {
+function formatWhen(value: string, locale: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+    : date.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 }
 
-// Plain text that pastes cleanly into a cybercrime.gov.in report or an email to the bank.
-function buildSummary(values: Values) {
-  const rows: [string, string][] = [
-    ["Transaction ID / UTR", values.utr.trim()],
-    ["Amount lost", values.amount.trim() && formatAmount(values.amount.trim())],
-    ["Date and time", values.when && formatWhen(values.when)],
-    ["Fraudster's phone number", values.phone.trim()],
-    ["Fraudster's UPI ID", values.upi.trim()],
-    ["Website / link", values.url.trim()],
+// Plain text that pastes cleanly into a cybercrime.gov.in report or an email to
+// the bank, with its labels and date in the chosen language.
+function buildSummary(values: Values, t: Translate, locale: string) {
+  const rows: [TranslationKey, string][] = [
+    ["summary.utr", values.utr.trim()],
+    ["summary.amount", values.amount.trim() && formatAmount(values.amount.trim(), locale)],
+    ["summary.when", values.when && formatWhen(values.when, locale)],
+    ["summary.phone", values.phone.trim()],
+    ["summary.upi", values.upi.trim()],
+    ["summary.url", values.url.trim()],
   ];
-  const lines = ["CYBER FRAUD INCIDENT SUMMARY", ""];
+  const lines = [t("summary.heading"), ""];
   for (const [label, value] of rows) {
-    if (value) lines.push(`${label}: ${value}`);
+    if (value) lines.push(`${t(label)}: ${value}`);
   }
-  if (values.description.trim()) lines.push("", "What happened:", values.description.trim());
+  if (values.description.trim()) lines.push("", t("summary.what"), values.description.trim());
   return lines.join("\n");
 }
 
@@ -75,10 +74,12 @@ function copyWithSelection(text: string) {
 
 // Everything stays in React state: nothing is stored or sent anywhere.
 export default function IncidentSummary() {
+  const { language } = useLanguage();
+  const t = useT();
   const [values, setValues] = useState<Values>(EMPTY);
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
   const resetTimer = useRef<ReturnType<typeof setTimeout>>();
-  const summary = buildSummary(values);
+  const summary = buildSummary(values, t, `${language}-IN`);
   const hasContent = Object.values(values).some((value) => value.trim());
 
   useEffect(() => () => clearTimeout(resetTimer.current), []);
@@ -114,7 +115,7 @@ export default function IncidentSummary() {
         {FIELDS.map((field) => (
           <div key={field.key} className="min-w-0">
             <label htmlFor={`incident-${field.key}`} className="text-sm font-medium text-neutral-300">
-              {field.label}
+              {t(`incident.field.${field.key}`)}
             </label>
             <input
               id={`incident-${field.key}`}
@@ -123,14 +124,16 @@ export default function IncidentSummary() {
               autoComplete="off"
               value={values[field.key]}
               onChange={(event) => update(field.key, event.target.value)}
-              placeholder={field.placeholder}
+              placeholder={
+                field.placeholder && field.key !== "when" ? t(`incident.placeholder.${field.key}`) : undefined
+              }
               className={`h-12 ${fieldClass}`}
             />
           </div>
         ))}
         <div className="sm:col-span-2">
           <label htmlFor="incident-description" className="text-sm font-medium text-neutral-300">
-            Short description
+            {t("incident.field.description")}
           </label>
           <textarea
             id="incident-description"
@@ -138,7 +141,7 @@ export default function IncidentSummary() {
             maxLength={1000}
             value={values.description}
             onChange={(event) => update("description", event.target.value)}
-            placeholder="e.g. A caller said they were from my bank and asked for the OTP to stop my card being blocked. ₹25,000 then left my account."
+            placeholder={t("incident.placeholder.description")}
             className={`resize-y py-2.5 leading-relaxed ${fieldClass}`}
           />
         </div>
@@ -148,36 +151,34 @@ export default function IncidentSummary() {
         type="button"
         onClick={copy}
         disabled={!hasContent}
-        className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-accent/50 bg-accent/10 text-base font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-accent/50 bg-accent/10 px-4 py-2 text-center text-base font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40"
       >
         {status === "copied" ? (
           <>
-            <CheckIcon className="h-5 w-5" />
-            Copied
+            <CheckIcon className="h-5 w-5 shrink-0" />
+            {t("incident.copied")}
           </>
         ) : (
           <>
-            <CopyIcon className="h-5 w-5" />
-            Copy summary
+            <CopyIcon className="h-5 w-5 shrink-0" />
+            {t("incident.copy")}
           </>
         )}
       </button>
       <p aria-live="polite" className="mt-2 text-center text-xs text-neutral-500">
         {status === "copied"
-          ? "Summary copied. Paste it into your report."
+          ? t("incident.copiedNote")
           : hasContent
             ? ""
-            : "Fill in any field to build your summary."}
+            : t("incident.fillHint")}
       </p>
 
       {status === "failed" && (
         <div className="mt-2">
-          <p className="text-sm text-neutral-300">
-            Couldn&apos;t copy automatically. Select the text below and copy it.
-          </p>
+          <p className="text-sm text-neutral-300">{t("incident.copyFailed")}</p>
           <textarea
             readOnly
-            aria-label="Incident summary"
+            aria-label={t("incident.title")}
             value={summary}
             rows={8}
             onFocus={(event) => event.currentTarget.select()}

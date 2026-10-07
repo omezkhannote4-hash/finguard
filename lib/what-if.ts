@@ -5,20 +5,12 @@ import type { ScamType } from "./analysis";
 export type WhatIfKey = "link" | "pay" | "otp";
 export type WhatIf = Record<WhatIfKey, string[]>;
 
-export const WHAT_IF_CHIPS: { text: string; key: WhatIfKey }[] = [
-  { text: "clicked the link", key: "link" },
-  { text: "paid the money", key: "pay" },
-  { text: "shared my OTP", key: "otp" },
-];
+// The suggested scenarios. Their chip text (whatif.chip.*) and the advice shown
+// with a saved chain (whatif.advice.*) are in lib/i18n.ts.
+export const WHAT_IF_CHIPS: WhatIfKey[] = ["link", "pay", "otp"];
 
-// One line of advice to go with each saved chain.
-export const WHAT_IF_ADVICE: Record<WhatIfKey, string> = {
-  link: "Don't enter anything on that page. If you already did, change your password and call your bank on the number on your card.",
-  pay: "Don't pay. If you already have, call 1930 now and follow the emergency steps.",
-  otp: "Never share an OTP. If you already did, call your bank on the number on your card to block transactions, then call 1930.",
-};
-
-// How each kind of scam usually unfolds: a scenario, not a prediction.
+// How each kind of scam usually unfolds: a scenario, not a prediction. These
+// saved chains are English only; they appear only when Groq can't be reached.
 // "Not a scam" has no entry, so genuine messages get no saved scare chains.
 export const WHAT_IF: Partial<Record<ScamType, WhatIf>> = {
   "KYC Phishing": {

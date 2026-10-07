@@ -3,6 +3,7 @@ import BackLink from "@/components/BackLink";
 import LanguageSelect from "@/components/LanguageSelect";
 import PageShell from "@/components/PageShell";
 import PaymentCheck from "@/components/PaymentCheck";
+import T from "@/components/T";
 
 export const metadata: Metadata = {
   title: "Before you pay · FinGuard",
@@ -20,9 +21,11 @@ export default function BeforeYouPayPage() {
         </>
       }
     >
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Before you pay</h1>
+      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+        <T k="header.beforeYouPay" />
+      </h1>
       <p className="mt-2 leading-relaxed text-neutral-400">
-        Five quick questions before you send money.
+        <T k="pay.intro" />
       </p>
       <PaymentCheck />
     </PageShell>

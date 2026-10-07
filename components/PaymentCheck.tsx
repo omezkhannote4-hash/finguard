@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useLanguage } from "@/components/LanguageProvider";
+import { useLanguage, useT } from "@/components/LanguageProvider";
 import ResultCard from "@/components/ResultCard";
 import ResultSkeleton from "@/components/ResultSkeleton";
 import { Spinner } from "@/components/icons";
 import type { Analysis } from "@/lib/analysis";
+import type { TranslationKey } from "@/lib/i18n";
 
-const QUESTIONS = [
-  { key: "newRecipient", label: "Is this a new recipient?" },
-  { key: "urgency", label: "Did someone create urgency?" },
-  { key: "linkOrQr", label: "Was a link or QR involved?" },
-] as const;
+// Each question's text is in lib/i18n.ts under pay.q.<key>.
+const QUESTIONS = ["newRecipient", "urgency", "linkOrQr"] as const;
 
-type QuestionKey = (typeof QUESTIONS)[number]["key"];
+type QuestionKey = (typeof QUESTIONS)[number];
 type Answers = Record<QuestionKey, "yes" | "no" | "">;
 
 // Matches the limits enforced by /api/payment-check.
@@ -28,10 +26,11 @@ function parseAmount(text: string) {
 
 export default function PaymentCheck() {
   const { language } = useLanguage();
+  const t = useT();
   const [amount, setAmount] = useState("");
   const [answers, setAnswers] = useState<Answers>({ newRecipient: "", urgency: "", linkOrQr: "" });
   const [reason, setReason] = useState("");
-  const [problem, setProblem] = useState("");
+  const [problem, setProblem] = useState<TranslationKey | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Analysis | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -56,7 +55,7 @@ export default function PaymentCheck() {
     setLoading(false);
     setResult(null);
     setUnavailable(false);
-    setProblem("");
+    setProblem(null);
   }
 
   async function check(event: FormEvent) {
@@ -65,17 +64,17 @@ export default function PaymentCheck() {
 
     const rupees = parseAmount(amount);
     if (!(rupees > 0) || rupees > MAX_AMOUNT) {
-      setProblem("Enter the amount in rupees, for example 25,000.");
+      setProblem("pay.needAmount");
       return;
     }
-    if (QUESTIONS.some((question) => !answers[question.key])) {
-      setProblem("Answer all three yes/no questions.");
+    if (QUESTIONS.some((question) => !answers[question])) {
+      setProblem("pay.needAnswers");
       return;
     }
 
     const controller = new AbortController();
     inFlight.current = controller;
-    setProblem("");
+    setProblem(null);
     setLoading(true);
     setResult(null);
     setUnavailable(false);
@@ -125,7 +124,7 @@ export default function PaymentCheck() {
       >
         <div>
           <label htmlFor="amount" className="text-sm font-medium text-neutral-300">
-            Amount in rupees
+            {t("pay.amount")}
           </label>
           <div className={`mt-2 flex h-12 items-center px-3 focus-within:border-accent/60 ${fieldClass}`}>
             <span aria-hidden="true" className="text-neutral-500">
@@ -140,31 +139,31 @@ export default function PaymentCheck() {
                 setAmount(event.target.value);
                 edited();
               }}
-              placeholder="25,000"
+              placeholder={t("pay.amountPlaceholder")}
               className="h-full min-w-0 flex-1 bg-transparent pl-2 text-base text-neutral-100 placeholder:text-neutral-500 focus:outline-none"
             />
           </div>
         </div>
 
         {QUESTIONS.map((question) => (
-          <fieldset key={question.key}>
-            <legend className="text-sm font-medium text-neutral-300">{question.label}</legend>
+          <fieldset key={question}>
+            <legend className="text-sm font-medium text-neutral-300">{t(`pay.q.${question}`)}</legend>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {(["yes", "no"] as const).map((value) => (
                 <label key={value} className="relative">
                   <input
                     type="radio"
-                    name={question.key}
+                    name={question}
                     value={value}
-                    checked={answers[question.key] === value}
+                    checked={answers[question] === value}
                     onChange={() => {
-                      setAnswers((current) => ({ ...current, [question.key]: value }));
+                      setAnswers((current) => ({ ...current, [question]: value }));
                       edited();
                     }}
                     className="peer sr-only"
                   />
                   <span className="flex h-12 cursor-pointer items-center justify-center rounded-xl border border-neutral-800 bg-neutral-950/70 text-base font-medium text-neutral-300 transition-colors hover:border-neutral-600 peer-checked:border-accent/60 peer-checked:bg-accent/10 peer-checked:text-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent">
-                    {value === "yes" ? "Yes" : "No"}
+                    {t(value === "yes" ? "pay.yes" : "pay.no")}
                   </span>
                 </label>
               ))}
@@ -174,7 +173,7 @@ export default function PaymentCheck() {
 
         <div>
           <label htmlFor="reason" className="text-sm font-medium text-neutral-300">
-            Reason for payment <span className="font-normal text-neutral-500">(optional)</span>
+            {t("pay.reason")} <span className="font-normal text-neutral-500">{t("pay.optional")}</span>
           </label>
           <textarea
             id="reason"
@@ -185,7 +184,7 @@ export default function PaymentCheck() {
               setReason(event.target.value);
               edited();
             }}
-            placeholder="e.g. A ₹2,000 processing fee to release a loan"
+            placeholder={t("pay.reasonPlaceholder")}
             className={`mt-2 block w-full resize-y px-3 py-2.5 leading-relaxed ${fieldClass}`}
           />
         </div>
@@ -193,22 +192,22 @@ export default function PaymentCheck() {
         <button
           type="submit"
           disabled={loading}
-          className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-base font-semibold text-neutral-950 transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 ${
+          className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-center text-base font-semibold text-neutral-950 transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 ${
             loading ? "cursor-wait" : ""
           }`}
         >
           {loading ? (
             <>
-              <Spinner className="h-5 w-5 motion-safe:animate-spin" />
-              Checking…
+              <Spinner className="h-5 w-5 shrink-0 motion-safe:animate-spin" />
+              {t("pay.checking")}
             </>
           ) : (
-            "Check this payment"
+            t("pay.check")
           )}
         </button>
         {problem && (
           <p role="status" className="text-center text-sm text-neutral-300">
-            {problem}
+            {t(problem)}
           </p>
         )}
       </form>
@@ -221,8 +220,7 @@ export default function PaymentCheck() {
             role="status"
             className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 text-sm text-neutral-300"
           >
-            Couldn&apos;t run the safety check right now. If you&apos;re unsure, wait and don&apos;t
-            pay yet.
+            {t("pay.unavailable")}
           </p>
         )}
         {result && <ResultCard analysis={result} variant="payment" />}

@@ -10,11 +10,12 @@ import {
   type KeyboardEvent,
 } from "react";
 import FollowUp from "@/components/FollowUp";
-import { useLanguage } from "@/components/LanguageProvider";
+import { useLanguage, useT } from "@/components/LanguageProvider";
 import ResultCard from "@/components/ResultCard";
 import ResultSkeleton from "@/components/ResultSkeleton";
 import { MicrophoneIcon, PhotoIcon, Spinner } from "@/components/icons";
 import type { Analysis } from "@/lib/analysis";
+import { LEVEL_KEYS, type TranslationKey } from "@/lib/i18n";
 import { imageToDataUrl } from "@/lib/image";
 import { INPUT_TYPES, type InputTypeId } from "@/lib/input-types";
 import { speechLocale } from "@/lib/languages";
@@ -27,15 +28,18 @@ const MAX_LENGTH = 5000;
 // How long a demo waits for a live result in another language before showing its saved one.
 const DEMO_TIMEOUT_MS = 10_000;
 
-type Result = { id: number; analysis: Analysis; message: string; note?: string };
+type Result = { id: number; analysis: Analysis; message: string; note?: TranslationKey };
+// The demo ids in presets.json; their button labels live in lib/i18n.ts.
+type PresetId = "kyc" | "lottery" | "investment" | "hdfc";
 
 export default function Analyser() {
   const { language } = useLanguage();
+  const t = useT();
   const [message, setMessage] = useState("");
   const [inputType, setInputType] = useState<InputTypeId>("message");
   const [loading, setLoading] = useState(false);
   const [reading, setReading] = useState(false);
-  const [readError, setReadError] = useState("");
+  const [readError, setReadError] = useState<TranslationKey | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -43,13 +47,12 @@ export default function Analyser() {
   const fileRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef<AbortController | null>(null);
   const resultCount = useRef(0);
-  const type = INPUT_TYPES.find((option) => option.id === inputType) ?? INPUT_TYPES[0];
 
   // Voice input: what was said replaces the text in the box and is analysed straight away.
   const speech = useSpeechInput(speechLocale(language), (transcript) => {
     const text = transcript.slice(0, MAX_LENGTH);
     setMessage(text);
-    setReadError("");
+    setReadError(null);
     runAnalysis(text);
   });
 
@@ -63,7 +66,7 @@ export default function Analyser() {
     });
   }, [result, unavailable]);
 
-  function showResult(analysis: Analysis, text: string, note?: string) {
+  function showResult(analysis: Analysis, text: string, note?: TranslationKey) {
     resultCount.current += 1;
     setResult({ id: resultCount.current, analysis, message: text, note });
   }
@@ -82,7 +85,7 @@ export default function Analyser() {
   function updateMessage(text: string) {
     if (text === message) return;
     setMessage(text);
-    setReadError("");
+    setReadError(null);
     speech.clearError();
     clearResult();
   }
@@ -149,7 +152,7 @@ export default function Analyser() {
     if (analysis) {
       showResult(analysis, text);
     } else if (saved) {
-      showResult(saved, text, "Live analysis wasn't available, so this is the saved English example.");
+      showResult(saved, text, "analyser.savedNote");
     } else {
       setUnavailable(true);
     }
@@ -169,7 +172,7 @@ export default function Analyser() {
     if (!file || reading) return;
 
     clearResult();
-    setReadError("");
+    setReadError(null);
     setReading(true);
     let text = "";
     try {
@@ -178,7 +181,7 @@ export default function Analyser() {
         image = await imageToDataUrl(file);
       } catch (err) {
         console.warn("Couldn't open the image:", err);
-        setReadError("Couldn't open that image. Try a PNG or JPEG, or type the message instead.");
+        setReadError("read.cantOpen");
       }
       if (image) {
         const res = await fetch("/api/extract", {
@@ -191,16 +194,12 @@ export default function Analyser() {
           text = data.text.trim().slice(0, MAX_LENGTH);
         } else {
           console.warn(`Reading the screenshot failed (HTTP ${res.status}):`, data?.error);
-          setReadError(
-            res.status === 422
-              ? "No text found in that image. Type or paste the message instead."
-              : "Couldn't read that image. Type or paste the message instead.",
-          );
+          setReadError(res.status === 422 ? "read.noText" : "read.failed");
         }
       }
     } catch (err) {
       console.warn("Reading the screenshot failed:", err);
-      setReadError("Couldn't read that image. Type or paste the message instead.");
+      setReadError("read.failed");
     } finally {
       setReading(false);
     }
@@ -224,19 +223,22 @@ export default function Analyser() {
   }
 
   const status = reading
-    ? "Reading image…"
+    ? t("analyser.readingImage")
     : speech.listening
-      ? "Listening…"
+      ? t("analyser.listening")
       : loading
-        ? "Analysing your message…"
+        ? t("analyser.statusAnalysing")
         : result
-          ? `Analysis ready: risk score ${result.analysis.risk_score} out of 100, ${result.analysis.risk_level}.`
+          ? t("analyser.statusReady", {
+              score: result.analysis.risk_score,
+              level: t(LEVEL_KEYS[result.analysis.risk_level]),
+            })
           : "";
 
   return (
     <div className="mt-10">
       <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-500">
-        Try a demo
+        {t("analyser.tryDemo")}
       </p>
       <div className="flex flex-wrap gap-2">
         {presets.map((preset) => {
@@ -254,7 +256,7 @@ export default function Analyser() {
                   : "border-neutral-800 bg-neutral-900/60 text-neutral-300 hover:border-neutral-600 hover:text-neutral-100"
               }`}
             >
-              {preset.label}
+              {t(`preset.${preset.id as PresetId}`)}
             </button>
           );
         })}
@@ -265,7 +267,7 @@ export default function Analyser() {
         className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 transition-colors focus-within:border-accent/60"
       >
         <fieldset>
-          <legend className="sr-only">What are you checking?</legend>
+          <legend className="sr-only">{t("analyser.typeLegend")}</legend>
           {/* Tighter on the narrowest phones; scrolls sideways rather than overlapping. */}
           <div className="flex gap-0.5 overflow-x-auto rounded-xl bg-neutral-950/60 p-1 min-[360px]:gap-1">
             {INPUT_TYPES.map((option) => (
@@ -280,14 +282,14 @@ export default function Analyser() {
                   className="peer sr-only"
                 />
                 <span className="flex h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg px-1.5 text-[13px] font-medium min-[360px]:px-2 text-neutral-400 transition-colors hover:text-neutral-200 peer-checked:bg-neutral-800 peer-checked:text-neutral-100 peer-focus-visible:ring-2 peer-focus-visible:ring-accent sm:text-sm">
-                  {option.label}
+                  {t(`type.${option.id}.label`)}
                 </span>
               </label>
             ))}
           </div>
         </fieldset>
         <label htmlFor="message" className="mt-2 block px-2 pt-1 text-sm font-medium text-neutral-300">
-          {type.heading}
+          {t(`type.${inputType}.heading`)}
         </label>
         <textarea
           ref={textareaRef}
@@ -298,10 +300,11 @@ export default function Analyser() {
           readOnly={reading || speech.listening}
           rows={6}
           maxLength={MAX_LENGTH}
-          placeholder={speech.listening ? "Listening…" : type.placeholder}
+          placeholder={speech.listening ? t("analyser.listening") : t(`type.${inputType}.placeholder`)}
           className="mt-2 block w-full resize-y bg-transparent px-2 py-1 text-base leading-relaxed text-neutral-100 placeholder:text-neutral-500 focus:outline-none"
         />
-        <div className="mt-3 flex gap-2">
+        {/* If a language's labels are too long for one row, Analyse moves to its own row. */}
+        <div className="mt-3 flex flex-wrap gap-2">
           {/* Hidden picker, opened by the screenshot button. */}
           <input
             ref={fileRef}
@@ -323,14 +326,14 @@ export default function Analyser() {
             {reading ? (
               <>
                 <Spinner className="h-5 w-5 motion-safe:animate-spin" />
-                Reading image…
+                {t("analyser.readingImage")}
               </>
             ) : (
               <>
                 <PhotoIcon className="h-5 w-5" />
                 {/* Icon only on the narrowest phones, to leave room for the microphone. */}
-                <span className="max-[359px]:sr-only sm:hidden">Screenshot</span>
-                <span className="hidden sm:inline">Upload screenshot</span>
+                <span className="max-[359px]:sr-only sm:hidden">{t("analyser.screenshot")}</span>
+                <span className="hidden sm:inline">{t("analyser.uploadScreenshot")}</span>
               </>
             )}
           </button>
@@ -341,7 +344,7 @@ export default function Analyser() {
               onClick={speech.listening ? speech.stop : speech.start}
               disabled={loading}
               aria-pressed={speech.listening}
-              aria-label={speech.listening ? "Stop listening" : "Speak the message"}
+              aria-label={speech.listening ? t("analyser.stopListening") : t("analyser.speak")}
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40 ${
                 speech.listening
                   ? "border-red-500/60 bg-red-500/15 text-red-300"
@@ -356,17 +359,17 @@ export default function Analyser() {
           <button
             type="submit"
             disabled={loading || reading || speech.listening || !message.trim()}
-            className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-accent text-base font-semibold text-neutral-950 transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 ${
+            className={`flex h-12 min-w-max flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-base font-semibold text-neutral-950 transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 ${
               loading ? "cursor-wait" : "disabled:cursor-not-allowed disabled:opacity-40"
             }`}
           >
             {loading ? (
               <>
                 <Spinner className="h-5 w-5 motion-safe:animate-spin" />
-                Analysing…
+                {t("analyser.analysing")}
               </>
             ) : (
-              "Analyse"
+              t("analyser.analyse")
             )}
           </button>
         </div>
@@ -374,7 +377,7 @@ export default function Analyser() {
       {speech.listening && (
         <p className="mt-3 flex items-center justify-center gap-2 text-sm text-red-300">
           <span aria-hidden="true" className="h-2 w-2 rounded-full bg-red-400 motion-safe:animate-pulse" />
-          Listening… tap the microphone to stop.
+          {t("analyser.listeningHint")}
         </p>
       )}
       {speech.error && (
@@ -382,7 +385,7 @@ export default function Analyser() {
           role="status"
           className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-4 py-3 text-sm text-neutral-300"
         >
-          {speech.error}
+          {t(speech.error)}
         </p>
       )}
       {readError && (
@@ -390,12 +393,10 @@ export default function Analyser() {
           role="status"
           className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-4 py-3 text-sm text-neutral-300"
         >
-          {readError}
+          {t(readError)}
         </p>
       )}
-      <p className="mt-3 text-center text-xs text-neutral-500">
-        Works with English, हिन्दी, ಕನ್ನಡ or a mix.
-      </p>
+      <p className="mt-3 text-center text-xs text-neutral-500">{t("analyser.worksWith")}</p>
 
       <p className="sr-only" aria-live="polite">
         {status}
@@ -409,14 +410,14 @@ export default function Analyser() {
             role="status"
             className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4 text-sm text-neutral-300"
           >
-            Live analysis isn&apos;t available right now. Try one of the demo messages above.
+            {t("analyser.unavailable")}
           </p>
         )}
         {/* Keyed by result, so each new result starts a fresh card and follow-up. */}
         {result && (
           <Fragment key={result.id}>
             {result.note && (
-              <p className="mb-3 text-center text-xs text-neutral-500">{result.note}</p>
+              <p className="mb-3 text-center text-xs text-neutral-500">{t(result.note)}</p>
             )}
             <ResultCard analysis={result.analysis} message={result.message} />
             <FollowUp message={result.message} analysis={result.analysis} language={language} />

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { TranslationKey } from "@/lib/i18n";
 
 // The parts of the Web Speech API's SpeechRecognition that FinGuard uses.
 // It isn't in TypeScript's DOM types, and Chrome and Safari still prefix it.
@@ -24,13 +25,14 @@ function recognitionConstructor(): RecognitionConstructor | undefined {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
-const ERRORS: Record<string, string> = {
-  "not-allowed": "Microphone access is blocked. Allow it in your browser, or type instead.",
-  "service-not-allowed": "Voice input isn't allowed in this browser. Type instead.",
-  "audio-capture": "No microphone was found. Type instead.",
-  network: "Voice input needs an internet connection. Type instead.",
-  "language-not-supported": "Voice input doesn't support this language here. Type instead.",
-  "no-speech": "Didn't catch that. Try again, or type instead.",
+// The message to show for each recognition error, as a translation key.
+const ERRORS: Record<string, TranslationKey> = {
+  "not-allowed": "voice.notAllowed",
+  "service-not-allowed": "voice.serviceNotAllowed",
+  "audio-capture": "voice.audioCapture",
+  network: "voice.network",
+  "language-not-supported": "voice.languageNotSupported",
+  "no-speech": "voice.noSpeech",
 };
 
 // Speech-to-text with the browser's built-in Web Speech API: nothing is sent to
@@ -39,7 +41,7 @@ const ERRORS: Record<string, string> = {
 export function useSpeechInput(locale: string, onTranscript: (text: string) => void) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<TranslationKey | null>(null);
   const recognitionRef = useRef<Recognition | null>(null);
   const onTranscriptRef = useRef(onTranscript);
 
@@ -55,7 +57,7 @@ export function useSpeechInput(locale: string, onTranscript: (text: string) => v
   function start() {
     const Recognition = recognitionConstructor();
     if (!Recognition || recognitionRef.current) return;
-    setError("");
+    setError(null);
 
     let recognition: Recognition;
     try {
@@ -65,7 +67,7 @@ export function useSpeechInput(locale: string, onTranscript: (text: string) => v
       recognition.continuous = false;
       recognition.maxAlternatives = 1;
     } catch {
-      setError("Couldn't start voice input. Type instead.");
+      setError("voice.cantStart");
       return;
     }
 
@@ -79,7 +81,7 @@ export function useSpeechInput(locale: string, onTranscript: (text: string) => v
     recognition.onerror = (event) => {
       if (event.error === "aborted") return;
       failed = true;
-      setError(ERRORS[event.error] ?? "Voice input stopped. Type instead.");
+      setError(ERRORS[event.error] ?? "voice.stopped");
     };
     recognition.onend = () => {
       recognitionRef.current = null;
@@ -93,7 +95,7 @@ export function useSpeechInput(locale: string, onTranscript: (text: string) => v
       recognitionRef.current = recognition;
       setListening(true);
     } catch {
-      setError("Couldn't start voice input. Type instead.");
+      setError("voice.cantStart");
     }
   }
 
@@ -102,5 +104,5 @@ export function useSpeechInput(locale: string, onTranscript: (text: string) => v
     recognitionRef.current?.stop();
   }
 
-  return { supported, listening, error, start, stop, clearError: () => setError("") };
+  return { supported, listening, error, start, stop, clearError: () => setError(null) };
 }

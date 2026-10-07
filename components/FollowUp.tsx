@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import { useT } from "@/components/LanguageProvider";
 import { MicrophoneIcon, Spinner } from "@/components/icons";
 import type { Analysis } from "@/lib/analysis";
 import { speechLocale, type LanguageCode } from "@/lib/languages";
@@ -18,6 +19,7 @@ export default function FollowUp({
   analysis: Analysis;
   language: LanguageCode;
 }) {
+  const t = useT();
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState("");
   const [answer, setAnswer] = useState("");
@@ -66,7 +68,7 @@ export default function FollowUp({
     <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3">
       <form onSubmit={ask} className="flex gap-2">
         <label htmlFor="follow-up" className="sr-only">
-          Ask about this result
+          {t("followup.placeholder")}
         </label>
         <input
           ref={inputRef}
@@ -79,7 +81,7 @@ export default function FollowUp({
           }}
           readOnly={speech.listening}
           maxLength={MAX_QUESTION_LENGTH}
-          placeholder={speech.listening ? "Listening…" : "Ask about this result"}
+          placeholder={speech.listening ? t("analyser.listening") : t("followup.placeholder")}
           autoComplete="off"
           className="h-12 min-w-0 flex-1 rounded-xl border border-neutral-800 bg-neutral-950/70 px-3 text-base text-neutral-100 transition-colors placeholder:text-neutral-500 focus:border-accent/60 focus:outline-none"
         />
@@ -90,7 +92,7 @@ export default function FollowUp({
             onClick={speech.listening ? speech.stop : speech.start}
             disabled={loading}
             aria-pressed={speech.listening}
-            aria-label={speech.listening ? "Stop listening" : "Speak your question"}
+            aria-label={speech.listening ? t("analyser.stopListening") : t("followup.speak")}
             className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40 ${
               speech.listening
                 ? "border-red-500/60 bg-red-500/15 text-red-300"
@@ -109,23 +111,19 @@ export default function FollowUp({
             loading ? "cursor-wait" : "disabled:cursor-not-allowed disabled:opacity-40"
           }`}
         >
-          {loading ? (
-            <Spinner className="h-5 w-5 motion-safe:animate-spin" />
-          ) : (
-            "Ask"
-          )}
-          {loading && <span className="sr-only">Asking…</span>}
+          {loading ? <Spinner className="h-5 w-5 motion-safe:animate-spin" /> : t("followup.ask")}
+          {loading && <span className="sr-only">{t("followup.asking")}</span>}
         </button>
       </form>
       {speech.listening && (
         <p className="mt-3 flex items-center justify-center gap-2 text-sm text-red-300">
           <span aria-hidden="true" className="h-2 w-2 rounded-full bg-red-400 motion-safe:animate-pulse" />
-          Listening… tap the microphone to stop.
+          {t("analyser.listeningHint")}
         </p>
       )}
       {speech.error && (
         <p role="status" className="mt-3 px-1 text-sm text-neutral-300">
-          {speech.error}
+          {t(speech.error)}
         </p>
       )}
 
@@ -133,19 +131,15 @@ export default function FollowUp({
         {asked && (
           <div className="mt-3 space-y-2 px-1 pb-1">
             <p className="break-words text-sm text-neutral-400">
-              <span className="font-medium text-neutral-300">You asked:</span> {asked}
+              <span className="font-medium text-neutral-300">{t("followup.youAsked")}</span> {asked}
             </p>
-            {loading && <p className="text-sm text-neutral-400">Thinking…</p>}
+            {loading && <p className="text-sm text-neutral-400">{t("followup.thinking")}</p>}
             {answer && (
               <p className="whitespace-pre-wrap break-words rounded-xl bg-neutral-950/70 p-4 text-[15px] leading-relaxed text-neutral-200">
                 {answer}
               </p>
             )}
-            {failed && (
-              <p className="text-sm text-neutral-300">
-                Couldn&apos;t get an answer right now. Try again in a moment.
-              </p>
-            )}
+            {failed && <p className="text-sm text-neutral-300">{t("followup.failed")}</p>}
           </div>
         )}
       </div>

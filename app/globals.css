@@ -6,3 +6,10 @@
   /* The app's one accent colour (Tailwind blue-400) as R G B. Used as `accent` in Tailwind. */
   --accent: 96 165 250;
 }
+
+/* Letter-spacing suits English, but it pulls apart the joined letters of the
+   Indian scripts, so it is switched off once another language is chosen. */
+:root:not(:lang(en)) .tracking-widest,
+:root:not(:lang(en)) .tracking-tight {
+  letter-spacing: normal;
+}

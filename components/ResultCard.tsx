@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { SIGNALS, type Analysis } from "@/lib/analysis";
+import { useT } from "@/components/LanguageProvider";
 import WhatIfSimulator from "@/components/WhatIfSimulator";
 import { CheckIcon, CrossIcon } from "@/components/icons";
+import { LEVEL_KEYS, SCAM_KEYS, SIGNAL_KEYS } from "@/lib/i18n";
 
 // Score bands: green < 30, yellow 30–59, orange 60–80, red > 80.
 function toneFor(score: number) {
@@ -40,7 +42,17 @@ type Tone = ReturnType<typeof toneFor>;
 const RADIUS = 52;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-function RiskMeter({ score, level, tone }: { score: number; level: string; tone: Tone }) {
+function RiskMeter({
+  score,
+  level,
+  label,
+  tone,
+}: {
+  score: number;
+  level: string;
+  label: string;
+  tone: Tone;
+}) {
   // Start empty and fill to the score on the next frames, so the ring animates in.
   const [shown, setShown] = useState(0);
   useEffect(() => {
@@ -53,7 +65,7 @@ function RiskMeter({ score, level, tone }: { score: number; level: string; tone:
   return (
     <div
       role="img"
-      aria-label={`Risk score ${score} out of 100: ${level}`}
+      aria-label={label}
       className="relative h-36 w-36 shrink-0"
     >
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" aria-hidden="true">
@@ -94,6 +106,7 @@ function escapeRegExp(text: string) {
 // Shows the message with every flagged phrase underlined in red, ignoring case.
 // Phrases that don't appear in the message are simply skipped.
 function HighlightedMessage({ text, phrases }: { text: string; phrases: string[] }) {
+  const t = useT();
   const terms = phrases
     .map((phrase) => phrase.trim())
     .filter(Boolean)
@@ -120,7 +133,7 @@ function HighlightedMessage({ text, phrases }: { text: string; phrases: string[]
         )}
       </p>
       <p className="mt-2 text-xs text-neutral-500">
-        {found ? "Suspicious phrases are underlined in red." : "Nothing in this message was flagged."}
+        {found ? t("result.flagged") : t("result.nothingFlagged")}
       </p>
     </>
   );
@@ -167,20 +180,21 @@ function NumberedList({ items, accent = false }: { items: string[]; accent?: boo
 
 // The analysed message with its highlights, and the Scam DNA table.
 function MessageDetails({ analysis, message }: { analysis: Analysis; message: string }) {
+  const t = useT();
   const detected = new Set(analysis.dna.filter((d) => d.detected).map((d) => d.signal));
 
   return (
     <>
-      <Section title="Your message">
+      <Section title={t("result.yourMessage")}>
         <HighlightedMessage text={message} phrases={analysis.flagged_phrases} />
       </Section>
 
-      <Section title="Scam DNA">
+      <Section title={t("result.scamDna")}>
         <table className="w-full text-sm">
           <thead className="sr-only">
             <tr>
-              <th scope="col">Signal</th>
-              <th scope="col">Detected?</th>
+              <th scope="col">{t("result.signal")}</th>
+              <th scope="col">{t("result.detectedQuestion")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-800/80">
@@ -192,18 +206,18 @@ function MessageDetails({ analysis, message }: { analysis: Analysis; message: st
                     scope="row"
                     className={`py-2.5 pr-4 text-left font-normal ${hit ? "text-neutral-100" : "text-neutral-500"}`}
                   >
-                    {signal}
+                    {t(SIGNAL_KEYS[signal])}
                   </th>
                   <td className="py-2.5 text-right">
                     {hit ? (
                       <span className="inline-flex items-center gap-1.5 font-medium text-red-400">
-                        <CheckIcon className="h-4 w-4" />
-                        Detected
+                        <CheckIcon className="h-4 w-4 shrink-0" />
+                        {t("result.detected")}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-neutral-500">
-                        <CrossIcon className="h-4 w-4" />
-                        Not found
+                        <CrossIcon className="h-4 w-4 shrink-0" />
+                        {t("result.notFound")}
                       </span>
                     )}
                   </td>
@@ -227,23 +241,30 @@ export default function ResultCard({
   message?: string;
   variant?: "message" | "payment";
 }) {
+  const t = useT();
   const tone = toneFor(analysis.risk_score);
   const looksSafe = analysis.scam_type === "Not a scam";
+  const level = t(LEVEL_KEYS[analysis.risk_level]);
 
   return (
     <article className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60">
       <div className="flex flex-col items-center gap-5 px-5 py-6 text-center sm:flex-row sm:px-6 sm:text-left">
         <div className="flex shrink-0 flex-col items-center">
-          <RiskMeter score={analysis.risk_score} level={analysis.risk_level} tone={tone} />
-          <p className="mt-2 whitespace-nowrap text-xs text-neutral-500">
-            Risk estimate, not a certainty.
+          <RiskMeter
+            score={analysis.risk_score}
+            level={level}
+            label={t("result.meterLabel", { score: analysis.risk_score, level })}
+            tone={tone}
+          />
+          <p className="mt-2 max-w-[16rem] text-center text-xs text-neutral-500">
+            {t("result.riskEstimate")}
           </p>
         </div>
         <div>
           <span
             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${tone.badge}`}
           >
-            {analysis.scam_type}
+            {t(SCAM_KEYS[analysis.scam_type])}
           </span>
           <p className="mt-3 text-lg font-medium leading-snug text-neutral-100">{analysis.simple}</p>
         </div>
@@ -252,32 +273,25 @@ export default function ResultCard({
       {variant === "message" && <MessageDetails analysis={analysis} message={message} />}
 
       {analysis.why.length > 0 && (
-        <Section title={looksSafe ? "Why this looks safe" : "Why this is risky"}>
+        <Section title={looksSafe ? t("result.whySafe") : t("result.whyRisky")}>
           <NumberedList items={analysis.why} />
         </Section>
       )}
 
       {analysis.action.length > 0 && (
-        <Section title="What to do" className="bg-accent/[0.04]">
+        <Section title={t("result.whatToDo")} className="bg-accent/[0.04]">
           <NumberedList items={analysis.action} accent />
         </Section>
       )}
 
       {variant === "message" && (
-        <Section title="Scenario, not a prediction">
+        <Section title={t("result.scenarioLabel")}>
           <WhatIfSimulator message={message} analysis={analysis} />
         </Section>
       )}
 
       <p className="border-t border-neutral-800 px-5 py-4 text-xs leading-relaxed text-neutral-500 sm:px-6">
-        {variant === "payment" ? (
-          "Safety check only. FinGuard cannot see or stop your actual payment."
-        ) : (
-          <>
-            This is an AI risk estimate, not a guarantee. If you&apos;re unsure, contact your bank
-            through its official app or the number on your card.
-          </>
-        )}
+        {variant === "payment" ? t("result.paymentDisclaimer") : t("result.disclaimer")}
       </p>
     </article>
   );

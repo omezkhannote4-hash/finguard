@@ -1,21 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/LanguageProvider";
 import { CheckIcon } from "@/components/icons";
+import type { TranslationKey } from "@/lib/i18n";
 
-const ITEMS = [
-  "Screenshots",
-  "Transaction ID or UTR",
-  "Amount",
-  "Date and time",
-  "Their phone number",
-  "Their UPI ID",
-  "Website link (URL)",
-  "Chat history",
+const ITEMS: TranslationKey[] = [
+  "evidence.screenshots",
+  "evidence.utr",
+  "evidence.amount",
+  "evidence.when",
+  "evidence.phone",
+  "evidence.upi",
+  "evidence.url",
+  "evidence.chat",
 ];
 
 // Ticks live in React state only: nothing is stored or sent anywhere.
 export default function EvidenceChecklist() {
+  const t = useT();
   const [checked, setChecked] = useState(() => ITEMS.map(() => false));
   const saved = checked.filter(Boolean).length;
 
@@ -42,15 +45,15 @@ export default function EvidenceChecklist() {
               >
                 <CheckIcon className="h-4 w-4" />
               </span>
-              <span className="peer-checked:text-neutral-400">{item}</span>
+              <span className="peer-checked:text-neutral-400">{t(item)}</span>
             </label>
           </li>
         ))}
       </ul>
       <p aria-live="polite" className="mt-2 text-xs text-neutral-500">
         {saved === ITEMS.length
-          ? "All saved. Keep them for your bank and the police."
-          : `${saved} of ${ITEMS.length} saved`}
+          ? t("evidence.allSaved")
+          : t("evidence.count", { saved, total: ITEMS.length })}
       </p>
     </div>
   );
