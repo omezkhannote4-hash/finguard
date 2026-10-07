@@ -23,10 +23,12 @@ export const SIGNALS = [
   "Payment Request",
 ] as const;
 
+export type ScamType = (typeof SCAM_TYPES)[number];
+
 export type Analysis = {
   risk_score: number;
   risk_level: (typeof RISK_LEVELS)[number];
-  scam_type: (typeof SCAM_TYPES)[number];
+  scam_type: ScamType;
   dna: { signal: (typeof SIGNALS)[number]; detected: boolean }[];
   flagged_phrases: string[];
   why: string[];

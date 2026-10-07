@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { SIGNALS, type Analysis } from "@/lib/analysis";
-import { CheckIcon, CrossIcon } from "@/components/icons";
+import { WHAT_IF, WHAT_IF_QUESTIONS, type WhatIf } from "@/lib/what-if";
+import { CheckIcon, ChevronDownIcon, CrossIcon } from "@/components/icons";
 
 // Score bands: green < 30, yellow 30–59, orange 60–80, red > 80.
 function toneFor(score: number) {
@@ -164,15 +165,69 @@ function NumberedList({ items, accent = false }: { items: string[]; accent?: boo
   );
 }
 
+// Collapsible "what if" rows. Native <details>, so they open and close without JavaScript.
+function WhatIfScenarios({ scenarios }: { scenarios: WhatIf }) {
+  return (
+    <div className="divide-y divide-neutral-800 overflow-hidden rounded-xl border border-neutral-800">
+      {WHAT_IF_QUESTIONS.map(({ key, question }) => {
+        const steps = scenarios[key];
+        return (
+          <details key={key} className="group">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-[15px] font-medium text-neutral-100 transition-colors hover:bg-neutral-800/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+              {question}
+              <ChevronDownIcon className="h-4 w-4 shrink-0 text-neutral-500 transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+            </summary>
+            {/* A chain of consequences; the last step, the outcome, is in red. */}
+            <ol role="list" className="px-4 pb-4 pt-1">
+              {steps.map((step, i) => {
+                const outcome = i === steps.length - 1;
+                return (
+                  <li key={step} className="relative flex gap-3 pb-3 last:pb-0">
+                    {!outcome && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -bottom-1 left-[5px] top-[18px] w-px -translate-x-1/2 bg-neutral-700"
+                      />
+                    )}
+                    <span
+                      aria-hidden="true"
+                      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                        outcome ? "bg-red-500" : "bg-neutral-600"
+                      }`}
+                    />
+                    <span
+                      className={`text-sm leading-relaxed ${
+                        outcome ? "font-medium text-red-300" : "text-neutral-300"
+                      }`}
+                    >
+                      {step}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ResultCard({ analysis, message }: { analysis: Analysis; message: string }) {
   const tone = toneFor(analysis.risk_score);
   const detected = new Set(analysis.dna.filter((d) => d.detected).map((d) => d.signal));
   const looksSafe = analysis.scam_type === "Not a scam";
+  const whatIf = WHAT_IF[analysis.scam_type];
 
   return (
     <article className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60">
       <div className="flex flex-col items-center gap-5 px-5 py-6 text-center sm:flex-row sm:px-6 sm:text-left">
-        <RiskMeter score={analysis.risk_score} level={analysis.risk_level} tone={tone} />
+        <div className="flex shrink-0 flex-col items-center">
+          <RiskMeter score={analysis.risk_score} level={analysis.risk_level} tone={tone} />
+          <p className="mt-2 whitespace-nowrap text-xs text-neutral-500">
+            Risk estimate, not a certainty.
+          </p>
+        </div>
         <div>
           <span
             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${tone.badge}`}
@@ -235,6 +290,12 @@ export default function ResultCard({ analysis, message }: { analysis: Analysis; 
       {analysis.action.length > 0 && (
         <Section title="What to do" className="bg-accent/[0.04]">
           <NumberedList items={analysis.action} accent />
+        </Section>
+      )}
+
+      {whatIf && (
+        <Section title="Scenario, not a prediction">
+          <WhatIfScenarios scenarios={whatIf} />
         </Section>
       )}
 

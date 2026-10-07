@@ -18,6 +18,7 @@ export default function Analyser() {
   const [result, setResult] = useState<Result | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const inFlight = useRef<AbortController | null>(null);
 
   // On phones the result appears below the fold, so bring it into view.
   useEffect(() => {
@@ -28,6 +29,18 @@ export default function Analyser() {
       block: "nearest",
     });
   }, [result, unavailable]);
+
+  // Editing the message makes the previous result stale, so clear it straight
+  // away and cancel any live request that's still running.
+  function updateMessage(text: string) {
+    if (text === message) return;
+    setMessage(text);
+    inFlight.current?.abort();
+    inFlight.current = null;
+    setLoading(false);
+    setResult(null);
+    setUnavailable(false);
+  }
 
   async function analyse(event: FormEvent) {
     event.preventDefault();
@@ -44,6 +57,8 @@ export default function Analyser() {
     }
 
     // Anything typed goes to the live API.
+    const controller = new AbortController();
+    inFlight.current = controller;
     setLoading(true);
     setResult(null);
     setUnavailable(false);
@@ -52,8 +67,10 @@ export default function Analyser() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => null);
+      if (controller.signal.aborted) return;
       if (res.ok && data) {
         setResult({ analysis: data as Analysis, message: text });
       } else {
@@ -61,10 +78,14 @@ export default function Analyser() {
         setUnavailable(true);
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.warn("Live analysis failed:", err);
       setUnavailable(true);
     } finally {
-      setLoading(false);
+      if (inFlight.current === controller) {
+        inFlight.current = null;
+        setLoading(false);
+      }
     }
   }
 
@@ -95,7 +116,7 @@ export default function Analyser() {
               key={preset.id}
               type="button"
               aria-pressed={active}
-              onClick={() => setMessage(preset.text)}
+              onClick={() => updateMessage(preset.text)}
               className={`inline-flex min-h-11 items-center text-balance rounded-full border px-4 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 active
                   ? "border-accent/60 bg-accent/10 text-accent"
@@ -118,7 +139,7 @@ export default function Analyser() {
         <textarea
           id="message"
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => updateMessage(e.target.value)}
           onKeyDown={submitOnShortcut}
           rows={6}
           maxLength={MAX_LENGTH}
@@ -150,7 +171,8 @@ export default function Analyser() {
         {status}
       </p>
 
-      <div ref={resultRef} className="mt-8 scroll-mt-6">
+      {/* scroll-mt clears the sticky header when the result scrolls into view. */}
+      <div ref={resultRef} className="mt-8 scroll-mt-24">
         {loading && <ResultSkeleton />}
         {unavailable && (
           <p
