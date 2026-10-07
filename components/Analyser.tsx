@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useEffect,
   useRef,
   useState,
@@ -12,11 +13,14 @@ import FollowUp from "@/components/FollowUp";
 import { useLanguage } from "@/components/LanguageProvider";
 import ResultCard from "@/components/ResultCard";
 import ResultSkeleton from "@/components/ResultSkeleton";
-import { PhotoIcon, Spinner } from "@/components/icons";
+import { MicrophoneIcon, PhotoIcon, Spinner } from "@/components/icons";
 import type { Analysis } from "@/lib/analysis";
 import { imageToDataUrl } from "@/lib/image";
+import { INPUT_TYPES, type InputTypeId } from "@/lib/input-types";
+import { speechLocale } from "@/lib/languages";
 import presets from "@/lib/presets.json";
 import { PRESET_FALLBACKS } from "@/lib/preset-fallbacks";
+import { useSpeechInput } from "@/lib/speech";
 
 // Matches the limit enforced by /api/analyse.
 const MAX_LENGTH = 5000;
@@ -28,6 +32,7 @@ type Result = { id: number; analysis: Analysis; message: string; note?: string }
 export default function Analyser() {
   const { language } = useLanguage();
   const [message, setMessage] = useState("");
+  const [inputType, setInputType] = useState<InputTypeId>("message");
   const [loading, setLoading] = useState(false);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState("");
@@ -38,6 +43,15 @@ export default function Analyser() {
   const fileRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef<AbortController | null>(null);
   const resultCount = useRef(0);
+  const type = INPUT_TYPES.find((option) => option.id === inputType) ?? INPUT_TYPES[0];
+
+  // Voice input: what was said replaces the text in the box and is analysed straight away.
+  const speech = useSpeechInput(speechLocale(language), (transcript) => {
+    const text = transcript.slice(0, MAX_LENGTH);
+    setMessage(text);
+    setReadError("");
+    runAnalysis(text);
+  });
 
   // On phones the result appears below the fold, so bring it into view.
   useEffect(() => {
@@ -69,11 +83,27 @@ export default function Analyser() {
     if (text === message) return;
     setMessage(text);
     setReadError("");
+    speech.clearError();
+    clearResult();
+  }
+
+  // The demos are messages, so picking one switches back to the Message tab.
+  function choosePreset(text: string) {
+    if (inputType !== "message") {
+      setInputType("message");
+      clearResult();
+    }
+    updateMessage(text);
+  }
+
+  function changeType(id: InputTypeId) {
+    if (id === inputType) return;
+    setInputType(id);
     clearResult();
   }
 
   async function runAnalysis(text: string) {
-    const preset = presets.find((p) => p.text.trim() === text);
+    const preset = inputType === "message" ? presets.find((p) => p.text.trim() === text) : undefined;
     const saved = preset ? PRESET_FALLBACKS[preset.id] : undefined;
 
     // In English, an unedited demo shows its saved result without calling the API.
@@ -97,7 +127,7 @@ export default function Analyser() {
       const res = await fetch("/api/analyse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, language }),
+        body: JSON.stringify({ message: text, language, inputType }),
         signal: controller.signal,
       });
       const data = await res.json().catch(() => null);
@@ -176,6 +206,8 @@ export default function Analyser() {
     }
 
     if (text) {
+      // A screenshot is of a message, whichever tab was open.
+      setInputType("message");
       setMessage(text);
       runAnalysis(text);
     } else {
@@ -193,11 +225,13 @@ export default function Analyser() {
 
   const status = reading
     ? "Reading image…"
-    : loading
-      ? "Analysing your message…"
-      : result
-        ? `Analysis ready: risk score ${result.analysis.risk_score} out of 100, ${result.analysis.risk_level}.`
-        : "";
+    : speech.listening
+      ? "Listening…"
+      : loading
+        ? "Analysing your message…"
+        : result
+          ? `Analysis ready: risk score ${result.analysis.risk_score} out of 100, ${result.analysis.risk_level}.`
+          : "";
 
   return (
     <div className="mt-10">
@@ -212,8 +246,8 @@ export default function Analyser() {
               key={preset.id}
               type="button"
               aria-pressed={active}
-              disabled={reading}
-              onClick={() => updateMessage(preset.text)}
+              disabled={reading || speech.listening}
+              onClick={() => choosePreset(preset.text)}
               className={`inline-flex min-h-11 items-center text-balance rounded-full border px-4 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50 ${
                 active
                   ? "border-accent/60 bg-accent/10 text-accent"
@@ -230,8 +264,30 @@ export default function Analyser() {
         onSubmit={analyse}
         className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-3 transition-colors focus-within:border-accent/60"
       >
-        <label htmlFor="message" className="block px-2 pt-1 text-sm font-medium text-neutral-300">
-          Paste the SMS, WhatsApp or email you received
+        <fieldset>
+          <legend className="sr-only">What are you checking?</legend>
+          {/* Tighter on the narrowest phones; scrolls sideways rather than overlapping. */}
+          <div className="flex gap-0.5 overflow-x-auto rounded-xl bg-neutral-950/60 p-1 min-[360px]:gap-1">
+            {INPUT_TYPES.map((option) => (
+              <label key={option.id} className="relative shrink-0 flex-auto">
+                <input
+                  type="radio"
+                  name="input-type"
+                  value={option.id}
+                  checked={inputType === option.id}
+                  onChange={() => changeType(option.id)}
+                  disabled={reading || speech.listening}
+                  className="peer sr-only"
+                />
+                <span className="flex h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg px-1.5 text-[13px] font-medium min-[360px]:px-2 text-neutral-400 transition-colors hover:text-neutral-200 peer-checked:bg-neutral-800 peer-checked:text-neutral-100 peer-focus-visible:ring-2 peer-focus-visible:ring-accent sm:text-sm">
+                  {option.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <label htmlFor="message" className="mt-2 block px-2 pt-1 text-sm font-medium text-neutral-300">
+          {type.heading}
         </label>
         <textarea
           ref={textareaRef}
@@ -239,10 +295,10 @@ export default function Analyser() {
           value={message}
           onChange={(e) => updateMessage(e.target.value)}
           onKeyDown={submitOnShortcut}
-          readOnly={reading}
+          readOnly={reading || speech.listening}
           rows={6}
           maxLength={MAX_LENGTH}
-          placeholder="e.g. Dear customer, your KYC has expired and your account will be blocked today. Update now: http://…"
+          placeholder={speech.listening ? "Listening…" : type.placeholder}
           className="mt-2 block w-full resize-y bg-transparent px-2 py-1 text-base leading-relaxed text-neutral-100 placeholder:text-neutral-500 focus:outline-none"
         />
         <div className="mt-3 flex gap-2">
@@ -259,7 +315,7 @@ export default function Analyser() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            disabled={reading || loading}
+            disabled={reading || loading || speech.listening}
             className={`flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-900 px-3.5 text-sm font-medium text-neutral-200 transition-colors hover:border-neutral-500 hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
               reading ? "cursor-wait" : "disabled:cursor-not-allowed disabled:opacity-40"
             }`}
@@ -272,14 +328,34 @@ export default function Analyser() {
             ) : (
               <>
                 <PhotoIcon className="h-5 w-5" />
-                <span className="sm:hidden">Screenshot</span>
+                {/* Icon only on the narrowest phones, to leave room for the microphone. */}
+                <span className="max-[359px]:sr-only sm:hidden">Screenshot</span>
                 <span className="hidden sm:inline">Upload screenshot</span>
               </>
             )}
           </button>
+          {/* Shown only in browsers with speech recognition. */}
+          {speech.supported && !reading && (
+            <button
+              type="button"
+              onClick={speech.listening ? speech.stop : speech.start}
+              disabled={loading}
+              aria-pressed={speech.listening}
+              aria-label={speech.listening ? "Stop listening" : "Speak the message"}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-40 ${
+                speech.listening
+                  ? "border-red-500/60 bg-red-500/15 text-red-300"
+                  : "border-neutral-700 bg-neutral-900 text-neutral-200 hover:border-neutral-500 hover:text-neutral-100"
+              }`}
+            >
+              <MicrophoneIcon
+                className={`h-5 w-5 ${speech.listening ? "motion-safe:animate-pulse" : ""}`}
+              />
+            </button>
+          )}
           <button
             type="submit"
-            disabled={loading || reading || !message.trim()}
+            disabled={loading || reading || speech.listening || !message.trim()}
             className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-accent text-base font-semibold text-neutral-950 transition hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 ${
               loading ? "cursor-wait" : "disabled:cursor-not-allowed disabled:opacity-40"
             }`}
@@ -295,6 +371,20 @@ export default function Analyser() {
           </button>
         </div>
       </form>
+      {speech.listening && (
+        <p className="mt-3 flex items-center justify-center gap-2 text-sm text-red-300">
+          <span aria-hidden="true" className="h-2 w-2 rounded-full bg-red-400 motion-safe:animate-pulse" />
+          Listening… tap the microphone to stop.
+        </p>
+      )}
+      {speech.error && (
+        <p
+          role="status"
+          className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-4 py-3 text-sm text-neutral-300"
+        >
+          {speech.error}
+        </p>
+      )}
       {readError && (
         <p
           role="status"
@@ -322,19 +412,15 @@ export default function Analyser() {
             Live analysis isn&apos;t available right now. Try one of the demo messages above.
           </p>
         )}
+        {/* Keyed by result, so each new result starts a fresh card and follow-up. */}
         {result && (
-          <>
+          <Fragment key={result.id}>
             {result.note && (
               <p className="mb-3 text-center text-xs text-neutral-500">{result.note}</p>
             )}
             <ResultCard analysis={result.analysis} message={result.message} />
-            <FollowUp
-              key={result.id}
-              message={result.message}
-              analysis={result.analysis}
-              language={language}
-            />
-          </>
+            <FollowUp message={result.message} analysis={result.analysis} language={language} />
+          </Fragment>
         )}
       </div>
     </div>

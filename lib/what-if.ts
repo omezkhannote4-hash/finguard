@@ -1,16 +1,25 @@
-// Static "what if" consequence chains for each scam type, shown on the result card.
-// Each one describes how this kind of scam usually unfolds: a scenario, not a prediction.
+// The what-if simulator's suggested scenarios, plus saved consequence chains it
+// shows for them when a live scenario can't be run.
 import type { ScamType } from "./analysis";
 
-export const WHAT_IF_QUESTIONS = [
-  { key: "link", question: "What if I click the link?" },
-  { key: "pay", question: "What if I pay?" },
-  { key: "otp", question: "What if I share the OTP?" },
-] as const;
+export type WhatIfKey = "link" | "pay" | "otp";
+export type WhatIf = Record<WhatIfKey, string[]>;
 
-export type WhatIf = Record<(typeof WHAT_IF_QUESTIONS)[number]["key"], string[]>;
+export const WHAT_IF_CHIPS: { text: string; key: WhatIfKey }[] = [
+  { text: "clicked the link", key: "link" },
+  { text: "paid the money", key: "pay" },
+  { text: "shared my OTP", key: "otp" },
+];
 
-// "Not a scam" has no entry, so genuine messages don't get scare scenarios.
+// One line of advice to go with each saved chain.
+export const WHAT_IF_ADVICE: Record<WhatIfKey, string> = {
+  link: "Don't enter anything on that page. If you already did, change your password and call your bank on the number on your card.",
+  pay: "Don't pay. If you already have, call 1930 now and follow the emergency steps.",
+  otp: "Never share an OTP. If you already did, call your bank on the number on your card to block transactions, then call 1930.",
+};
+
+// How each kind of scam usually unfolds: a scenario, not a prediction.
+// "Not a scam" has no entry, so genuine messages get no saved scare chains.
 export const WHAT_IF: Partial<Record<ScamType, WhatIf>> = {
   "KYC Phishing": {
     link: [

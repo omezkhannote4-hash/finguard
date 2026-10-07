@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fail, groqChat, TEXT_MODEL } from "@/lib/groq";
+import { INPUT_TYPES } from "@/lib/input-types";
 import { languageName } from "@/lib/languages";
 import { normaliseAnalysis } from "@/lib/normalise";
 
@@ -42,7 +43,7 @@ Never claim certainty — this is a risk estimate.`;
 }
 
 export async function POST(request: Request) {
-  let body: { message?: unknown; language?: unknown } | null;
+  let body: { message?: unknown; language?: unknown; inputType?: unknown } | null;
   try {
     body = await request.json();
   } catch {
@@ -57,10 +58,14 @@ export async function POST(request: Request) {
     return fail(413, `"message" must be at most ${MAX_MESSAGE_LENGTH} characters.`);
   }
 
+  // A URL, phone number, UPI ID or email adds one line saying what the input is.
+  const promptLine = INPUT_TYPES.find((type) => type.id === body?.inputType)?.promptLine;
+  const system = systemPrompt(languageName(body?.language)) + (promptLine ? `\n\n${promptLine}` : "");
+
   const reply = await groqChat({
     model: TEXT_MODEL,
     messages: [
-      { role: "system", content: systemPrompt(languageName(body?.language)) },
+      { role: "system", content: system },
       { role: "user", content: message },
     ],
     response_format: { type: "json_object" },
