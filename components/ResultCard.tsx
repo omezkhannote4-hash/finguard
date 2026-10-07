@@ -213,31 +213,12 @@ function WhatIfScenarios({ scenarios }: { scenarios: WhatIf }) {
   );
 }
 
-export default function ResultCard({ analysis, message }: { analysis: Analysis; message: string }) {
-  const tone = toneFor(analysis.risk_score);
+// The analysed message with its highlights, and the Scam DNA table.
+function MessageDetails({ analysis, message }: { analysis: Analysis; message: string }) {
   const detected = new Set(analysis.dna.filter((d) => d.detected).map((d) => d.signal));
-  const looksSafe = analysis.scam_type === "Not a scam";
-  const whatIf = WHAT_IF[analysis.scam_type];
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60">
-      <div className="flex flex-col items-center gap-5 px-5 py-6 text-center sm:flex-row sm:px-6 sm:text-left">
-        <div className="flex shrink-0 flex-col items-center">
-          <RiskMeter score={analysis.risk_score} level={analysis.risk_level} tone={tone} />
-          <p className="mt-2 whitespace-nowrap text-xs text-neutral-500">
-            Risk estimate, not a certainty.
-          </p>
-        </div>
-        <div>
-          <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${tone.badge}`}
-          >
-            {analysis.scam_type}
-          </span>
-          <p className="mt-3 text-lg font-medium leading-snug text-neutral-100">{analysis.simple}</p>
-        </div>
-      </div>
-
+    <>
       <Section title="Your message">
         <HighlightedMessage text={message} phrases={analysis.flagged_phrases} />
       </Section>
@@ -280,6 +261,44 @@ export default function ResultCard({ analysis, message }: { analysis: Analysis; 
           </tbody>
         </table>
       </Section>
+    </>
+  );
+}
+
+// "payment" is the before-you-pay check: just the meter, why and action steps.
+export default function ResultCard({
+  analysis,
+  message = "",
+  variant = "message",
+}: {
+  analysis: Analysis;
+  message?: string;
+  variant?: "message" | "payment";
+}) {
+  const tone = toneFor(analysis.risk_score);
+  const looksSafe = analysis.scam_type === "Not a scam";
+  const whatIf = variant === "message" ? WHAT_IF[analysis.scam_type] : undefined;
+
+  return (
+    <article className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/60">
+      <div className="flex flex-col items-center gap-5 px-5 py-6 text-center sm:flex-row sm:px-6 sm:text-left">
+        <div className="flex shrink-0 flex-col items-center">
+          <RiskMeter score={analysis.risk_score} level={analysis.risk_level} tone={tone} />
+          <p className="mt-2 whitespace-nowrap text-xs text-neutral-500">
+            Risk estimate, not a certainty.
+          </p>
+        </div>
+        <div>
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${tone.badge}`}
+          >
+            {analysis.scam_type}
+          </span>
+          <p className="mt-3 text-lg font-medium leading-snug text-neutral-100">{analysis.simple}</p>
+        </div>
+      </div>
+
+      {variant === "message" && <MessageDetails analysis={analysis} message={message} />}
 
       {analysis.why.length > 0 && (
         <Section title={looksSafe ? "Why this looks safe" : "Why this is risky"}>
@@ -300,8 +319,14 @@ export default function ResultCard({ analysis, message }: { analysis: Analysis; 
       )}
 
       <p className="border-t border-neutral-800 px-5 py-4 text-xs leading-relaxed text-neutral-500 sm:px-6">
-        This is an AI risk estimate, not a guarantee. If you&apos;re unsure, contact your bank
-        through its official app or the number on your card.
+        {variant === "payment" ? (
+          "Safety check only. FinGuard cannot see or stop your actual payment."
+        ) : (
+          <>
+            This is an AI risk estimate, not a guarantee. If you&apos;re unsure, contact your bank
+            through its official app or the number on your card.
+          </>
+        )}
       </p>
     </article>
   );

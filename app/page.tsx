@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import Analyser from "@/components/Analyser";
 import LanguageSelect from "@/components/LanguageSelect";
 import PageShell from "@/components/PageShell";
-import { AlertIcon, ArrowRightIcon, CheckIcon, ShieldIcon } from "@/components/icons";
+import { AlertIcon, ArrowRightIcon, CheckIcon, RupeeIcon, ShieldIcon } from "@/components/icons";
 import { SIGNALS } from "@/lib/analysis";
 
 const STEPS = [
@@ -80,7 +80,13 @@ export default function Home() {
             <span className="sr-only sm:not-sr-only">FinGuard</span>
           </Link>
           <div className="flex items-center gap-2">
-            <LanguageSelect />
+            <Link
+              href="/before-you-pay"
+              className="hidden h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm font-medium text-neutral-300 transition-colors hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:inline-flex"
+            >
+              Before you pay
+            </Link>
+            <LanguageSelect compact />
             <Link
               href="/emergency"
               className="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-red-600 px-3 text-sm font-semibold text-white shadow-lg shadow-red-950/40 transition-colors hover:bg-red-500 active:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 min-[360px]:px-4"
@@ -91,6 +97,20 @@ export default function Home() {
             </Link>
           </div>
         </>
+      }
+      belowHeader={
+        // On phones the header is full, so the before-you-pay link sits just below it.
+        <Link
+          href="/before-you-pay"
+          className="mt-4 flex min-h-12 items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 px-4 py-2 text-sm text-neutral-300 transition-colors hover:border-neutral-600 hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:hidden"
+        >
+          <RupeeIcon className="h-5 w-5 shrink-0 text-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="font-semibold text-neutral-100">Before you pay:</span> check a payment
+            first
+          </span>
+          <ArrowRightIcon className="h-4 w-4 shrink-0 text-neutral-500" />
+        </Link>
       }
     >
       <div className="text-center">

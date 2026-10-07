@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { ReactNode } from "react";
+import BackLink from "@/components/BackLink";
 import EvidenceChecklist from "@/components/EvidenceChecklist";
+import IncidentSummary from "@/components/IncidentSummary";
 import PageShell from "@/components/PageShell";
-import { ArrowLeftIcon, ExternalLinkIcon, PhoneIcon } from "@/components/icons";
+import { ExternalLinkIcon, PhoneIcon } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "I've been scammed · FinGuard",
@@ -63,17 +64,7 @@ function Step({
 
 export default function EmergencyPage() {
   return (
-    <PageShell
-      header={
-        <Link
-          href="/"
-          className="-ml-2 inline-flex h-11 items-center gap-2 rounded-full px-2 text-sm font-medium text-neutral-300 transition-colors hover:text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          Back to FinGuard
-        </Link>
-      }
-    >
+    <PageShell header={<BackLink />}>
       <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Been scammed? Act now.</h1>
       <p className="mt-2 leading-relaxed text-neutral-400">Five steps, most urgent first.</p>
 
@@ -131,6 +122,17 @@ export default function EmergencyPage() {
           <EvidenceChecklist />
         </Step>
       </ol>
+
+      <section aria-labelledby="incident-summary" className="mt-12">
+        <h2 id="incident-summary" className="text-xl font-semibold tracking-tight text-neutral-100">
+          Incident summary
+        </h2>
+        <p className="mt-1 text-sm leading-relaxed text-neutral-400">
+          Fill in what you know, then paste it into your report on cybercrime.gov.in or keep it
+          ready for your call to 1930. Nothing you type leaves this page.
+        </p>
+        <IncidentSummary />
+      </section>
     </PageShell>
   );
 }
