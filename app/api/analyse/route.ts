@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { RISK_LEVELS, SCAM_TYPES, SIGNALS, type Analysis } from "@/lib/analysis";
+import { fail, groqChat, TEXT_MODEL } from "@/lib/groq";
+import { languageName } from "@/lib/languages";
 
-// gemini-2.0-flash was shut down on 1 June 2026; this is Google's listed replacement.
-const MODEL = "gemini-3.6-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 const MAX_MESSAGE_LENGTH = 5000;
 
-// Gives a slow Gemini reply time to finish before Vercel stops the function.
+// Gives a slow model reply time to finish before Vercel stops the function.
 export const maxDuration = 30;
 
-const SYSTEM_PROMPT = `You are a financial scam risk analyser for Indian users.
+function systemPrompt(language: string) {
+  return `You are a financial scam risk analyser for Indian users.
 Analyse the user's message and return ONLY valid JSON:
 
 {
@@ -34,71 +34,81 @@ CRITICAL: Genuine bank transaction alerts, OTP delivery messages and
 balance updates are NOT scams. Score them under 20 and set
 scam_type "Not a scam". Never flag a legitimate message.
 
-Input may be English, Hindi, Kannada or mixed. Reply in the same language.
+Input may be English, Hindi, Kannada, Malayalam, Tamil, Telugu or mixed.
+Write "why", "simple" and "action" in ${language}. Keep risk_level,
+scam_type and the signal names in English exactly as listed above, and
+copy flagged_phrases verbatim from the input without translating them.
 Never claim certainty — this is a risk estimate.`;
+}
 
-// Gemini's structured output: the reply must be JSON in exactly this shape.
-// The enums stay in English even when the explanation is in Hindi or Kannada.
-const RESPONSE_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    risk_score: { type: "INTEGER" },
-    risk_level: { type: "STRING", enum: RISK_LEVELS },
-    scam_type: { type: "STRING", enum: SCAM_TYPES },
-    dna: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          signal: { type: "STRING", enum: SIGNALS },
-          detected: { type: "BOOLEAN" },
-        },
-        required: ["signal", "detected"],
-      },
-    },
-    flagged_phrases: { type: "ARRAY", items: { type: "STRING" } },
-    why: { type: "ARRAY", items: { type: "STRING" } },
-    simple: { type: "STRING" },
-    action: { type: "ARRAY", items: { type: "STRING" } },
-  },
-  required: [
-    "risk_score",
-    "risk_level",
-    "scam_type",
-    "dna",
-    "flagged_phrases",
-    "why",
-    "simple",
-    "action",
-  ],
-};
+function pick<T extends string>(options: readonly T[], value: unknown): T | undefined {
+  const wanted = String(value ?? "").trim().toLowerCase();
+  return options.find((option) => option.toLowerCase() === wanted);
+}
 
-type GeminiResponse = {
-  candidates?: {
-    content?: { parts?: { text?: string; thought?: boolean }[] };
-    finishReason?: string;
-  }[];
-  promptFeedback?: { blockReason?: string };
-  error?: { message?: string };
-};
+// The seven signals start with different letters ("urg", "thr", "otp", …), so
+// small naming slips like "OTP Request" or "Threats" still match.
+function stem(signal: unknown) {
+  return String(signal ?? "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 3);
+}
 
-// `detail` (Gemini's own error text) is only included while developing locally.
-function fail(status: number, error: string, detail?: string) {
-  const showDetail = detail && process.env.NODE_ENV === "development";
-  return NextResponse.json(showDetail ? { error, detail } : { error }, {
-    status,
-  });
+function strings(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+    : [];
+}
+
+// Same bands as the risk meter; only used if the model's own level is invalid.
+function levelFor(score: number): Analysis["risk_level"] {
+  if (score < 30) return "LOW";
+  if (score < 60) return "MEDIUM";
+  if (score <= 80) return "HIGH";
+  return "CRITICAL";
+}
+
+// JSON mode guarantees valid JSON but not this exact shape, so check every
+// field and repair small slips before the result reaches the page.
+function normalise(raw: unknown, message: string): Analysis | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+
+  const score = Number(r.risk_score);
+  const scamType = pick(SCAM_TYPES, r.scam_type);
+  if (!Number.isFinite(score) || !scamType || typeof r.simple !== "string") return null;
+  const riskScore = Math.min(100, Math.max(0, Math.round(score)));
+
+  const detected = new Set(
+    (Array.isArray(r.dna) ? r.dna : [])
+      .filter((d) => d?.detected === true || d?.detected === "true")
+      .map((d) => stem(d?.signal)),
+  );
+
+  // Flagged phrases must really appear in the message (ignoring case) so the page can highlight them.
+  const lowerMessage = message.toLowerCase();
+
+  return {
+    risk_score: riskScore,
+    risk_level: pick(RISK_LEVELS, r.risk_level) ?? levelFor(riskScore),
+    scam_type: scamType,
+    dna: SIGNALS.map((signal) => ({ signal, detected: detected.has(stem(signal)) })),
+    flagged_phrases: strings(r.flagged_phrases).filter((phrase) =>
+      lowerMessage.includes(phrase.toLowerCase()),
+    ),
+    why: strings(r.why),
+    simple: r.simple,
+    action: strings(r.action),
+  };
 }
 
 export async function POST(request: Request) {
-  let body: unknown;
+  let body: { message?: unknown; language?: unknown } | null;
   try {
     body = await request.json();
   } catch {
     return fail(400, 'Send JSON like {"message": "..."}.');
   }
 
-  const message = (body as { message?: unknown } | null)?.message;
+  const message = body?.message;
   if (typeof message !== "string" || !message.trim()) {
     return fail(400, '"message" must be a non-empty string.');
   }
@@ -106,77 +116,28 @@ export async function POST(request: Request) {
     return fail(413, `"message" must be at most ${MAX_MESSAGE_LENGTH} characters.`);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("GEMINI_API_KEY is not set");
-    return fail(500, "The server is missing GEMINI_API_KEY.");
-  }
+  const reply = await groqChat({
+    model: TEXT_MODEL,
+    messages: [
+      { role: "system", content: systemPrompt(languageName(body?.language)) },
+      { role: "user", content: message },
+    ],
+    response_format: { type: "json_object" },
+    reasoning_effort: "low",
+    include_reasoning: false,
+    max_completion_tokens: 4096,
+  });
+  if ("error" in reply) return reply.error;
 
-  let res: Response;
+  let raw: unknown;
   try {
-    res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts: [{ text: message }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
-      signal: AbortSignal.timeout(25_000),
-    });
-  } catch (err) {
-    console.error("Gemini request failed:", err);
-    if ((err as Error)?.name === "TimeoutError") {
-      return fail(504, "Gemini took too long to respond. Try again.");
-    }
-    return fail(502, "Could not reach Gemini.");
-  }
-
-  const data: GeminiResponse | null = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    const detail = data?.error?.message;
-    console.error(`Gemini error ${res.status}: ${detail}`);
-    if (res.status === 429) {
-      return fail(429, "Too many requests to Gemini. Wait a minute and try again.", detail);
-    }
-    if (res.status === 401 || res.status === 403) {
-      return fail(502, "Gemini rejected the API key. Check GEMINI_API_KEY.", detail);
-    }
-    return fail(502, `Gemini returned an error (HTTP ${res.status}).`, detail);
-  }
-
-  const candidate = data?.candidates?.[0];
-  const text = candidate?.content?.parts
-    ?.filter((part) => !part.thought)
-    .map((part) => part.text ?? "")
-    .join("");
-  if (!text) {
-    const reason = data?.promptFeedback?.blockReason ?? candidate?.finishReason;
-    return fail(502, "Gemini returned no analysis. Try again.", reason);
-  }
-
-  let analysis: Analysis;
-  try {
-    analysis = JSON.parse(text);
+    raw = JSON.parse(reply.text);
   } catch {
-    return fail(502, "Gemini returned malformed JSON.", text.slice(0, 300));
+    return fail(502, "The model returned malformed JSON. Try again.", reply.text.slice(0, 300));
   }
-  const lists = [analysis?.dna, analysis?.flagged_phrases, analysis?.why, analysis?.action];
-  if (typeof analysis?.risk_score !== "number" || !lists.every(Array.isArray)) {
-    return fail(502, "Gemini returned JSON in an unexpected shape.", text.slice(0, 300));
+  const analysis = normalise(raw, message);
+  if (!analysis) {
+    return fail(502, "The model returned JSON in an unexpected shape.", reply.text.slice(0, 300));
   }
-
-  // Enforce two promises the UI relies on: a 0–100 score, and flagged phrases
-  // that really appear in the message, ignoring case (so they can be highlighted).
-  analysis.risk_score = Math.min(100, Math.max(0, Math.round(analysis.risk_score)));
-  const lowerMessage = message.toLowerCase();
-  analysis.flagged_phrases = analysis.flagged_phrases.filter(
-    (phrase) => phrase && lowerMessage.includes(phrase.toLowerCase()),
-  );
-
   return NextResponse.json(analysis);
 }

@@ -21,9 +21,9 @@ export default function PageShell({ header, children }: { header: ReactNode; chi
           <p className="text-balance text-sm font-medium text-neutral-300">
             FinGuard never asks for your password, OTP or PIN.
           </p>
-          {/* On phones the line breaks after "Gemini" rather than mid-phrase. */}
+          {/* On phones the line breaks after "Groq" rather than mid-phrase. */}
           <p className="mt-2">
-            <span className="block sm:inline">Built with Google Gemini</span>
+            <span className="block sm:inline">Built on Groq</span>
             <span aria-hidden="true" className="hidden sm:inline">
               {" · "}
             </span>

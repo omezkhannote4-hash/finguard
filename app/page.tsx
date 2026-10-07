@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import Analyser from "@/components/Analyser";
+import LanguageSelect from "@/components/LanguageSelect";
 import PageShell from "@/components/PageShell";
 import { AlertIcon, ArrowRightIcon, CheckIcon, ShieldIcon } from "@/components/icons";
 import { SIGNALS } from "@/lib/analysis";
@@ -11,7 +12,7 @@ const STEPS = [
     body: "Any SMS, WhatsApp or email, in English, Hindi, Kannada or a mix.",
   },
   {
-    title: "Gemini checks seven scam signals",
+    title: "AI checks seven scam signals",
     body: "The Scam DNA signals above, scored with a weighted risk rubric.",
   },
   {
@@ -70,21 +71,25 @@ export default function Home() {
         <>
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-lg font-semibold tracking-tight text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="flex shrink-0 items-center gap-2 rounded-lg font-semibold tracking-tight text-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-inset ring-accent/25">
               <ShieldIcon className="h-5 w-5" />
             </span>
-            FinGuard
+            {/* On phones the big title below already says FinGuard, leaving room for the language picker. */}
+            <span className="sr-only sm:not-sr-only">FinGuard</span>
           </Link>
-          <Link
-            href="/emergency"
-            className="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-red-600 px-4 text-sm font-semibold text-white shadow-lg shadow-red-950/40 transition-colors hover:bg-red-500 active:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950"
-          >
-            {/* Dropped on the narrowest phones so the header never overflows. */}
-            <AlertIcon className="hidden h-4 w-4 min-[360px]:block" />
-            I&apos;ve been scammed
-          </Link>
+          <div className="flex items-center gap-2">
+            <LanguageSelect />
+            <Link
+              href="/emergency"
+              className="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-red-600 px-3 text-sm font-semibold text-white shadow-lg shadow-red-950/40 transition-colors hover:bg-red-500 active:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 min-[360px]:px-4"
+            >
+              {/* Dropped on the narrowest phones so the header never overflows. */}
+              <AlertIcon className="hidden h-4 w-4 min-[360px]:block" />
+              I&apos;ve been scammed
+            </Link>
+          </div>
         </>
       }
     >

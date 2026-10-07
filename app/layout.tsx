@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +21,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-neutral-950 text-neutral-100 antialiased">
-        {children}
+        {/* Shares the header's language choice with the analyser. */}
+        <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
   );
