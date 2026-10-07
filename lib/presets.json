@@ -1,0 +1,22 @@
+[
+  {
+    "id": "kyc",
+    "label": "KYC phishing SMS",
+    "text": "Dear SBI customer, your YONO account will be BLOCKED today due to incomplete KYC. Update your PAN immediately at http://sbi-kyc-update.in to avoid suspension. Share the OTP sent to your mobile with our executive to verify. -SBI"
+  },
+  {
+    "id": "lottery",
+    "label": "Lottery prize",
+    "text": "Congratulations! Your mobile number has won Rs 25,00,000 in the KBC Jio Lucky Draw 2026. To claim your prize, pay a processing fee of Rs 12,500 to UPI ID kbclottery2026@ybl and send your Aadhaar photo on WhatsApp. Offer valid for 24 hours only."
+  },
+  {
+    "id": "investment",
+    "label": "Fake investment",
+    "text": "Hi! I'm Neha from the Zerodha VIP Stock Club 📈 Our members made 300% returns last month on expert tips. Invest just ₹10,000 today and get a guaranteed ₹50,000 in 7 days, zero risk. Only 5 seats left! Join our WhatsApp group now: https://vip-stock-club.in/join"
+  },
+  {
+    "id": "hdfc",
+    "label": "Real bank SMS - check we don't false-alarm",
+    "text": "Sent Rs.1,250.00\nFrom HDFC Bank A/C *4321\nTo SWIGGY\nOn 07/10/26\nRef 628015476321\nNot You?\nCall 18002586161/SMS BLOCK UPI to 7308080808"
+  }
+]

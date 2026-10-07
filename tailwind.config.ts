@@ -6,7 +6,11 @@ const config: Config = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        accent: "rgb(var(--accent) / <alpha-value>)",
+      },
+    },
   },
   plugins: [],
 };
