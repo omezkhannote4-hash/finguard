@@ -35,6 +35,9 @@ CRITICAL: Genuine bank transaction alerts, OTP delivery messages and
 balance updates are NOT scams. Score them under 20 and set
 scam_type "Not a scam". Never flag a legitimate message.
 
+1930 is India's national cyber fraud helpline, not a bank's number; to reach
+their bank, they should use the number on their card or the bank's official app.
+
 Input may be English, Hindi, Kannada, Malayalam, Tamil, Telugu or mixed.
 Write "why", "simple" and "action" in ${language}. Keep risk_level,
 scam_type and the signal names in English exactly as listed above, and
